@@ -15,6 +15,13 @@ public sealed class RuntimePatcher(ClientVersion clientVersion, Stream stream, b
     #region Patch Methods
     public void ApplyServerHostnamePatch(IPAddress ipAddress) => ApplyServerHostnamePatch(ipAddress.GetAddressBytes());
 
+    public void ApplyFixDarknessPatch()
+    {
+        stream.Position = 0x5F1D0D;
+        
+        Writer.Write([0x08, 0x02]);
+    }
+    
     public void ApplyServerHostnamePatch(IEnumerable<byte> ipAddressBytes)
     {
         CheckIfDisposed();

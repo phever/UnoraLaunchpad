@@ -946,6 +946,7 @@ namespace UnoraLaunchpad
                 patcher.ApplySkipIntroVideoPatch();
 
             patcher.ApplyMultipleInstancesPatch();
+            patcher.ApplyFixDarknessPatch();
         }
 
         private void InjectDll(IntPtr accessHandle)
