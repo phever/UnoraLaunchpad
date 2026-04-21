@@ -1,4 +1,4 @@
-﻿namespace UnoraLaunchpad;
+namespace UnoraLaunchpad;
 
 public sealed class GameUpdate
 {

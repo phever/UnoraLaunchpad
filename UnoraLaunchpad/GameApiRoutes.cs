@@ -1,4 +1,4 @@
-﻿namespace UnoraLaunchpad;
+namespace UnoraLaunchpad;
 
 using Definitions;
 

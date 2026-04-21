@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -30,13 +30,13 @@ public sealed class UnoraClient
         {
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
         };
-        
+
         ApiClient = new HttpClient(handler)
         {
             BaseAddress = new Uri(CONSTANTS.BASE_API_URL),
             Timeout = TimeSpan.FromMinutes(30)
         };
-        
+
     }
 
     public async Task<string> GetLauncherVersionAsync()
@@ -55,7 +55,7 @@ public sealed class UnoraClient
         }
     }
 
-    
+
     public Task<List<FileDetail>> GetFileDetailsAsync(string fileDetailsUrl)
     {
         return ResiliencePolicy.ExecuteAsync(() => InnerGetFileDetailsAsync(fileDetailsUrl));

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic; // Required for List
+using System.Collections.Generic; // Required for List
 
 namespace UnoraLaunchpad;
 
@@ -16,4 +16,6 @@ public sealed class Settings
     public List<Character> SavedCharacters { get; set; } = [];
     public Dictionary<string, string> Combos { get; set; } = [];
     public bool IsComboSystemEnabled { get; set; } = false;
+    public string LutrisId { get; set; }
+    public string GamePath { get; set; }
 }

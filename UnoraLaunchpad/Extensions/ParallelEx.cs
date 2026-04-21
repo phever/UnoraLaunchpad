@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
@@ -25,7 +25,7 @@ public static class ParallelEx
 
         foreach (var item in source)
             block.Post(item);
-        
+
         block.Complete();
 
         await block.Completion;

@@ -1,6 +1,6 @@
-﻿using System.IO;
-using Newtonsoft.Json;
 using System.Collections.Generic; // Make sure this is present for List<Account>
+using System.IO;
+using Newtonsoft.Json;
 
 namespace UnoraLaunchpad;
 
@@ -21,7 +21,7 @@ public sealed class FileService
             return settings;
         }
         // When creating new Settings, SavedAccounts is already initialized by its property initializer.
-        return new Settings(); 
+        return new Settings();
     }
 
     public static void SaveSettings(Settings settings, string path)
