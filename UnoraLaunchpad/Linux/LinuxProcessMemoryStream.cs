@@ -6,16 +6,23 @@ namespace UnoraLaunchpad.Linux;
 
 public sealed class LinuxProcessMemoryStream : Stream
 {
-    private const long MODULE_BASE_ADDRESS = 0x400000;
+    private const long DEFAULT_BASE_ADDRESS = 0x400000;
     private readonly int _pid;
     private readonly FileStream _memStream;
+    private readonly long _actualBaseAddress;
     private bool _isDisposed;
     private bool _attached;
-    private long _position = MODULE_BASE_ADDRESS;
+    private long _position = DEFAULT_BASE_ADDRESS;
 
     public LinuxProcessMemoryStream(int pid)
     {
         _pid = pid;
+        _actualBaseAddress = GetModuleBaseAddress(pid);
+
+        if (_actualBaseAddress != DEFAULT_BASE_ADDRESS)
+        {
+            Console.WriteLine($"[Memory] Detected relocation: {DEFAULT_BASE_ADDRESS:X} -> {_actualBaseAddress:X}");
+        }
 
         string memPath = $"/proc/{pid}/mem";
         if (!File.Exists(memPath))
@@ -44,22 +51,49 @@ public sealed class LinuxProcessMemoryStream : Stream
         }
     }
 
+    private long GetModuleBaseAddress(int pid)
+    {
+        string mapsPath = $"/proc/{pid}/maps";
+        if (!File.Exists(mapsPath)) return DEFAULT_BASE_ADDRESS;
+
+        try
+        {
+            // We look for the first executable mapping of the game
+            foreach (var line in File.ReadLines(mapsPath))
+            {
+                var lineLower = line.ToLower();
+                if (lineLower.Contains("darkages.exe") || lineLower.Contains("unora.exe"))
+                {
+                    var parts = line.Split(['-', ' '], StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0 && long.TryParse(parts[0], System.Globalization.NumberStyles.HexNumber, null, out long addr))
+                    {
+                        return addr;
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return DEFAULT_BASE_ADDRESS;
+    }
+
     private bool Attach(int pid)
     {
         long result = LinuxNativeMethods.ptrace(LinuxNativeMethods.PTRACE_ATTACH, pid, IntPtr.Zero, IntPtr.Zero);
         if (result == -1)
         {
-            int errno = Marshal.GetLastWin32Error();
-            if (errno == 1) // EPERM: already attached or restricted
-            {
-                return false;
-            }
             return false;
         }
 
         // Wait for the process to stop
         LinuxNativeMethods.waitpid(pid, out _, 0);
         return true;
+    }
+
+    private long GetPhysicalAddress(long virtualAddress)
+    {
+        // Adjust for relocation if necessary
+        return _actualBaseAddress + (virtualAddress - DEFAULT_BASE_ADDRESS);
     }
 
     private void Detach()
@@ -98,7 +132,7 @@ public sealed class LinuxProcessMemoryStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        _memStream.Seek(_position, SeekOrigin.Begin);
+        _memStream.Seek(GetPhysicalAddress(_position), SeekOrigin.Begin);
         int read = _memStream.Read(buffer, offset, count);
         _position += read;
         return read;
@@ -111,7 +145,7 @@ public sealed class LinuxProcessMemoryStream : Stream
             throw new UnauthorizedAccessException($"Stream is not writable for PID {_pid}. Try: echo 0 | sudo tee /proc/sys/kernel/yama/ptrace_scope");
         }
 
-        _memStream.Seek(_position, SeekOrigin.Begin);
+        _memStream.Seek(GetPhysicalAddress(_position), SeekOrigin.Begin);
         _memStream.Write(buffer, offset, count);
         _memStream.Flush();
         _position += count;

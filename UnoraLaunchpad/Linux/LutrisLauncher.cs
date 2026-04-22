@@ -147,24 +147,6 @@ public static class LutrisLauncher
         return env;
     }
 
-    public static void SetupWineHostsRedirect(string winePrefix, string hostname, string ip)
-    {
-        if (string.IsNullOrEmpty(winePrefix)) return;
-
-        string hostsPath = Path.Combine(winePrefix, "drive_c", "windows", "system32", "drivers", "etc", "hosts");
-        if (!File.Exists(hostsPath)) return;
-
-        try
-        {
-            string content = File.ReadAllText(hostsPath);
-            string entry = $"{ip}  {hostname}";
-            if (content.Contains(hostname) && content.Contains(ip)) return;
-            File.AppendAllText(hostsPath, Environment.NewLine + entry + Environment.NewLine);
-            Console.WriteLine($"[Launcher] Added Wine hosts redirect: {hostname} -> {ip}");
-        }
-        catch { }
-    }
-
     public static void ApplyRegistryFix(string winePrefix, string wineCmd, Dictionary<string, string> env, string exePath = null)
     {
         if (string.IsNullOrEmpty(winePrefix) || !Directory.Exists(winePrefix)) return;

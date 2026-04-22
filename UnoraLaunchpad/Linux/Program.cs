@@ -30,18 +30,12 @@ public static class Program
             _settings.LutrisId = args[0];
         }
 
+        var (ipAddress, port) = GetServerConnection();
+
         string winePrefix = null;
         if (!string.IsNullOrEmpty(_settings.GamePath) && _settings.GamePath.Contains("drive_c"))
         {
             winePrefix = _settings.GamePath.Substring(0, _settings.GamePath.IndexOf("drive_c"));
-        }
-
-        var (ipAddress, port) = GetServerConnection();
-        if (!string.IsNullOrEmpty(winePrefix))
-        {
-            LutrisLauncher.SetupWineHostsRedirect(winePrefix, "da0.kru.com", ipAddress.ToString());
-            LutrisLauncher.SetupWineHostsRedirect(winePrefix, "game.kornetworld.com", ipAddress.ToString());
-            LutrisLauncher.SetupWineHostsRedirect(winePrefix, "www.darkages.com", ipAddress.ToString());
         }
 
         if (_settings.UseDawndWindower && !string.IsNullOrEmpty(_settings.GamePath))
