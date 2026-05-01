@@ -55,7 +55,7 @@
     <Reference Include="PresentationFramework" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="GameApiRoutes.cs" />
+    <Compile Include="UnoraApiRoutes.cs" />
     <Compile Include="PatchNotesWindow.xaml.cs">
       <DependentUpon>PatchNotesWindow.xaml</DependentUpon>
     </Compile>
@@ -87,6 +87,10 @@
     <Compile Include="Launcher\NativeMethods.cs" />
     <Compile Include="Launcher\ProcessAccess.cs" />
     <Compile Include="Launcher\ProcessMemoryStream.cs" />
+    <Compile Include="Launcher\IGameLauncher.cs" />
+    <Compile Include="Launcher\LaunchContext.cs" />
+    <Compile Include="Launcher\LegacyDarkAgesLauncher.cs" />
+    <Compile Include="Launcher\ChaosClientLauncher.cs" />
     <Compile Include="Launcher\RuntimePatcher.cs" />
     <Compile Include="Launcher\SuspendedProcess.cs" />
     <Compile Include="Launcher\Win32ProcessAccess.cs" />

@@ -53,6 +53,8 @@ internal sealed partial class SettingsWindow : Window
         DawndCheckBox.IsChecked = _settings.UseDawndWindower;
         SkipIntroCheckBox.IsChecked = _settings.SkipIntro;
         LocalhostCheckBox.IsChecked = _settings.UseLocalhost;
+        UseChaosClientCheckBox.IsChecked = _settings.UseChaosClient;
+        ApplyChaosClientCheckboxState(); // sync initial enabled state of Dawnd/SkipIntro
 
         var currentTheme = string.IsNullOrEmpty(_settings.SelectedTheme) ? "Dark" : _settings.SelectedTheme;
         _settings.SelectedTheme = currentTheme; // Ensure it's set for persistence
@@ -61,14 +63,6 @@ internal sealed partial class SettingsWindow : Window
         ThemeComboBox.SelectedItem = ThemeComboBox.Items.Cast<ComboBoxItem>()
                                                   .FirstOrDefault(cbi => cbi.Content.ToString() == currentTheme) ?? ThemeComboBox.Items[0];
 
-        var currentGame = string.IsNullOrEmpty(_settings.SelectedGame) ? "Unora" : _settings.SelectedGame;
-        _settings.SelectedGame = currentGame;
-
-        GameComboBox.SelectedItem = GameComboBox.Items.Cast<ComboBoxItem>()
-                                                .FirstOrDefault(cbi => cbi.Content.ToString() == currentGame)
-                                    ?? GameComboBox.Items[0];
-
-        
         // Apply the loaded theme
         App.ChangeTheme(GetThemeUri(currentTheme));
 
@@ -100,7 +94,7 @@ internal sealed partial class SettingsWindow : Window
         return new Uri(uriString, UriKind.Absolute);
     }
 
-    
+
     private void ThemeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (ThemeComboBox.SelectedItem is ComboBoxItem selectedItem)
@@ -108,7 +102,7 @@ internal sealed partial class SettingsWindow : Window
             var themeName = selectedItem.Content.ToString();
             App.ChangeTheme(GetThemeUri(themeName));
             // Optionally, update settings so it persists:
-            _settings.SelectedTheme = themeName; 
+            _settings.SelectedTheme = themeName;
         }
     }
 
@@ -118,14 +112,9 @@ internal sealed partial class SettingsWindow : Window
         _settings.UseDawndWindower = DawndCheckBox.IsChecked ?? false;
         _settings.SkipIntro = SkipIntroCheckBox.IsChecked ?? false;
         _settings.UseLocalhost = LocalhostCheckBox.IsChecked ?? false;
+        _settings.UseChaosClient = UseChaosClientCheckBox.IsChecked ?? false;
         _settings.IsComboSystemEnabled = EnableComboSystemCheckBox.IsChecked ?? false; // Save checkbox state
 
-        if (GameComboBox.SelectedItem is ComboBoxItem selectedGameItem)
-            _settings.SelectedGame = selectedGameItem.Content.ToString();
-        else
-            _settings.SelectedGame = "Unora";
-
-        
         if (ThemeComboBox.SelectedItem is ComboBoxItem selectedThemeItem)
         {
             _settings.SelectedTheme = selectedThemeItem.Content.ToString();
@@ -134,7 +123,7 @@ internal sealed partial class SettingsWindow : Window
         {
             _settings.SelectedTheme = "Dark"; // Fallback, though ComboBox should always have a selection
         }
-        
+
 
         _mainWindow.SaveSettings(_settings); // Persist settings through MainWindow
         _mainWindow.ReloadSettingsAndRefresh();
@@ -147,6 +136,18 @@ internal sealed partial class SettingsWindow : Window
     {
         if (e.ChangedButton == MouseButton.Left)
             DragMove();
+    }
+
+    private void UseChaosClientCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        ApplyChaosClientCheckboxState();
+    }
+
+    private void ApplyChaosClientCheckboxState()
+    {
+        var on = UseChaosClientCheckBox.IsChecked ?? false;
+        DawndCheckBox.IsEnabled     = !on;
+        SkipIntroCheckBox.IsEnabled = !on;
     }
 
     // New event handlers

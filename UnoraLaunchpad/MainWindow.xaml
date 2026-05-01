@@ -7,7 +7,7 @@
         xmlns:local="clr-namespace:UnoraLaunchpad"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="Unora Launcher"
+        Title="Unora: Elemental Harmony"
         Height="585"
         Width="800"
         WindowStyle="None"

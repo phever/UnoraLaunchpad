@@ -113,19 +113,6 @@
                             </ComboBox>
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal"
-                                    HorizontalAlignment="Center"
-                                    Margin="0,10,0,0">
-                            <Label Content="Game:"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource PrimaryTextColor}" />
-                            <ComboBox x:Name="GameComboBox"
-                                      Width="150"
-                                      VerticalAlignment="Center">
-                                <ComboBoxItem Content="Unora"/>
-                                <!-- Add more games here if needed -->
-                            </ComboBox>
-                        </StackPanel>
                         <CheckBox x:Name="LocalhostCheckBox"
                                   Foreground="{DynamicResource IconForegroundColor}"
                                   Background="{DynamicResource PrimaryTextColor}"
@@ -133,6 +120,16 @@
                                   Content="Localhost"
                                   HorizontalAlignment="Center"
                                   VerticalAlignment="Center" />
+
+                        <CheckBox x:Name="UseChaosClientCheckBox"
+                                  Content="Use Chaos Client"
+                                  Foreground="{DynamicResource IconForegroundColor}"
+                                  Background="{DynamicResource PrimaryTextColor}"
+                                  Margin="0,10,0,0"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Checked="UseChaosClientCheckBox_Changed"
+                                  Unchecked="UseChaosClientCheckBox_Changed" />
                     </StackPanel>
 
                     <!-- New Account Management Section -->
