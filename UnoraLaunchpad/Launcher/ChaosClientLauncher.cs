@@ -20,15 +20,17 @@ public sealed class ChaosClientLauncher : IGameLauncher
             WorkingDirectory = chaosFolder,
             UseShellExecute  = false, // required to set EnvironmentVariables
             CreateNoWindow   = false,
+            EnvironmentVariables =
+            {
+                ["DA_PATH"] = @"..\",
+                ["DA_LOBBY_HOST"] = context.LobbyHost,
+                ["DA_LOBBY_PORT"] = context.LobbyPort.ToString()
+            }
         };
 
-        psi.EnvironmentVariables["DA_PATH"]       = @"..\";
-        psi.EnvironmentVariables["DA_LOBBY_HOST"] = context.LobbyHost;
-        psi.EnvironmentVariables["DA_LOBBY_PORT"] = context.LobbyPort.ToString(CultureInfo.InvariantCulture);
-
         var process = Process.Start(psi)
-            ?? throw new InvalidOperationException(
-                "Process.Start returned null; the OS did not create a new process.");
+                      ?? throw new InvalidOperationException(
+                          "Process.Start returned null; the OS did not create a new process.");
 
         return Task.FromResult(process);
     }

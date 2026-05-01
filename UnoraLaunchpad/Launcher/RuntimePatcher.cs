@@ -40,13 +40,6 @@ public sealed class RuntimePatcher(ClientVersion clientVersion, Stream stream, b
         for (var i = 0; i < 13; i++)
             Writer.Write((byte)0x90); // NOP
     }
-    
-    public void ApplyFixDarknessPatch()
-    {
-        stream.Position = 0x5F1D0D;
-        
-        Writer.Write([0x08, 0x02]);
-    }
 
     public void ApplyServerPortPatch(int port)
     {
