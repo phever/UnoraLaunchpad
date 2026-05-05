@@ -27,6 +27,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Costura.Fody" Version="5.7.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="InputSimulator" Version="1.0.4" />
+    <PackageReference Include="Ivytalk.Flurl.Http.Net40" Version="3.2.5" />
+    <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.4.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Polly" Version="8.3.1" />
     <PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
@@ -39,4 +47,10 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="discordpurp.png" />
+    <Resource Include="favicon.ico" />
+  </ItemGroup>
+
 </Project>

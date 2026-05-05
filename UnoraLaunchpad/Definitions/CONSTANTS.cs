@@ -12,4 +12,6 @@ public static class CONSTANTS
     public const string GET_FILE_RESOURCE = "get/";
     public const string GET_GAME_UPDATES_RESOURCE = "gameUpdates";
     public const string UNORA_FOLDER_NAME = "Unora";
+    public const string CHAOS_CLIENT_FOLDER_NAME = "ChaosClient";
+    public const string CHAOS_CLIENT_EXECUTABLE  = "Chaos.Client.exe";
 }

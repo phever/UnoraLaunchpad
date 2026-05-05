@@ -285,14 +285,4 @@ public static class Program
         }
         return Path.Combine(baseDir, relativePath);
     }
-
-    private static GameApiRoutes GetCurrentApiRoutes()
-    {
-        var baseUrl = CONSTANTS.BASE_API_URL.TrimEnd('/');
-        var selectedGame = string.IsNullOrWhiteSpace(_settings.SelectedGame)
-            ? CONSTANTS.UNORA_FOLDER_NAME
-            : _settings.SelectedGame;
-
-        return new GameApiRoutes(baseUrl, selectedGame);
-    }
 }

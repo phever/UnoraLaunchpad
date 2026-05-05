@@ -4,8 +4,6 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using System.Windows;
@@ -20,7 +18,6 @@ using UnoraLaunchpad.Definitions;
 using Application = System.Windows.Application;
 using System.Windows.Interop; // Required for HwndSource
 using System.Collections.Generic; // Required for Dictionary
-// UnoraLaunchpad; // Added for PasswordHelper and Character - already in namespace
 using MessageBox = System.Windows.MessageBox;
 using MouseButton = System.Windows.Input.MouseButton;
 
@@ -62,6 +59,11 @@ namespace UnoraLaunchpad
             get => _launcherSettings?.UseLocalhost ?? false;
             set { if (_launcherSettings != null) _launcherSettings.UseLocalhost = value; }
         }
+        public bool UseChaosClient
+        {
+            get => _launcherSettings?.UseChaosClient ?? false;
+            set { if (_launcherSettings != null) _launcherSettings.UseChaosClient = value; }
+        }
         public ICommand OpenGameUpdateCommand { get; }
         public object Sync { get; } = new();
 
@@ -84,11 +86,7 @@ namespace UnoraLaunchpad
 
         private void ScreenshotsButton_Click(object sender, RoutedEventArgs e)
         {
-            // Determine the selected game's folder name.
-            // Fallback to "Unora" if not found or if settings are null.
-            var selectedGameFolder = _launcherSettings?.SelectedGame ?? CONSTANTS.UNORA_FOLDER_NAME;
-
-            var screenshotBrowser = new ScreenshotBrowserWindow(selectedGameFolder);
+            var screenshotBrowser = new ScreenshotBrowserWindow(CONSTANTS.UNORA_FOLDER_NAME);
             screenshotBrowser.Owner = this; // Set the owner for proper dialog behavior
             screenshotBrowser.Show();
         }
@@ -502,11 +500,6 @@ namespace UnoraLaunchpad
 
         private async Task CheckAndUpdateLauncherAsync()
         {
-            // Only run the update check if Unora is the selected game
-            var selectedGame = _launcherSettings?.SelectedGame ?? "Unora";
-            if (!selectedGame.Equals("Unora", StringComparison.OrdinalIgnoreCase))
-                return;
-
             var serverVersion = await UnoraClient.GetLauncherVersionAsync();
             var localVersion = GetLocalLauncherVersion();
 
@@ -545,10 +538,9 @@ namespace UnoraLaunchpad
             ApplySettings();
             SetUiStateUpdating();
 
-            var apiRoutes = GetCurrentApiRoutes();
-            var fileDetails = await UnoraClient.GetFileDetailsAsync(apiRoutes.GameDetails);
+            var fileDetails = await UnoraClient.GetFileDetailsAsync(UnoraApiRoutes.FileDetails);
 
-            Debug.WriteLine($"[Launcher] Downloading {fileDetails.Count} files for {apiRoutes.GameDetails}");
+            Debug.WriteLine($"[Launcher] Downloading {fileDetails.Count} files for {UnoraApiRoutes.FileDetails}");
 
             var filesToUpdate = fileDetails.Where(NeedsUpdate).ToList();
             Debug.WriteLine($"[Launcher] Files to update: {filesToUpdate.Count}");
@@ -591,7 +583,7 @@ namespace UnoraLaunchpad
 
                     try
                     {
-                        await UnoraClient.DownloadFileAsync(apiRoutes.GameFile(fileDetail.RelativePath), filePath,
+                        await UnoraClient.DownloadFileAsync(UnoraApiRoutes.GameFile(fileDetail.RelativePath), filePath,
                             progress);
                     }
                     catch (Exception ex)
@@ -622,7 +614,7 @@ namespace UnoraLaunchpad
         }
 
         private string GetFilePath(string relativePath) =>
-            Path.Combine(_launcherSettings?.SelectedGame ?? CONSTANTS.UNORA_FOLDER_NAME, relativePath);
+            Path.Combine(CONSTANTS.UNORA_FOLDER_NAME, relativePath);
 
         private void EnsureDirectoryExists(string filePath)
         {
@@ -854,9 +846,8 @@ namespace UnoraLaunchpad
 
         public async void ReloadSettingsAndRefresh()
         {
-            ApplySettings(); // Load settings from disk (SelectedGame, etc.) / Repopulates ComboBox
-            SetWindowTitle(); // Update the window title everywhere
-            await LoadAndBindGameUpdates(); // Reload news/patches for the selected server
+            ApplySettings();
+            await LoadAndBindGameUpdates(); // Reload news/patches
             await CheckForFileUpdates(); // Check/download updates for selected server
             RegisterGlobalHotkeys();
             Dispatcher.BeginInvoke(new Action(SetUiStateComplete));
@@ -864,136 +855,63 @@ namespace UnoraLaunchpad
 
         public void ReloadSettingsAndRefreshLocal()
         {
-            ApplySettings(); // Reloads from disk into _launcherSettings / Repopulates ComboBox
+            ApplySettings(); // Reloads settings from disk into _launcherSettings
             // Optionally: Re-fetch game updates and other game-specific info
             _ = LoadAndBindGameUpdates();
         }
 
-        private (string folder, string exe) GetGameLaunchInfo(string selectedGame) =>
-            // You can load this from a config file for extensibility if needed.
-            selectedGame switch
-            {
-                "Unora" => ("Unora", "Unora.exe"),
-                "Legends" => ("Legends", "Client.exe"),
-                // Add more as needed
-                _ => ("Unora", "Unora.exe") // Fallback
-            };
-
-        private void Launch(object sender, EventArgs e)
+        private async void Launch(object sender, EventArgs e)
         {
-            var (ipAddress, serverPort) = GetServerConnection();
+            var (lobbyHost, lobbyPort) = GetLobbyEndpoint(UseLocalhost);
+            var installRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, CONSTANTS.UNORA_FOLDER_NAME);
 
-            // Use SelectedGame from your settings
-            var selectedGame = _launcherSettings?.SelectedGame ?? "Unora";
-            var (gameFolder, gameExe) = GetGameLaunchInfo(selectedGame);
+            if (UseChaosClient && !VerifyChaosClientPresent(installRoot))
+                return;
 
-            // Build the full path to the executable
-            var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, gameFolder, gameExe);
+            var context = new LaunchContext(
+                installRoot:       installRoot,
+                lobbyHost:         lobbyHost,
+                lobbyPort:         lobbyPort,
+                skipIntro:         SkipIntro,
+                useDawndWindower:  UseDawndWindower);
 
-            using var process = SuspendedProcess.Start(exePath);
+            IGameLauncher launcher = UseChaosClient
+                ? (IGameLauncher)new ChaosClientLauncher()
+                : new LegacyDarkAgesLauncher();
 
             try
             {
-                PatchClient(process, ipAddress, serverPort, false);
-
-                if (UseDawndWindower)
-                {
-                    var processPtr = NativeMethods.OpenProcess(ProcessAccessFlags.FullAccess, true, process.ProcessId);
-                    InjectDll(processPtr);
-                }
-
-                // Optionally, set window title to the selected game name
-                _ = RenameGameWindowAsync(Process.GetProcessById(process.ProcessId), selectedGame);
+                var process = await launcher.LaunchAsync(context);
+                _ = RenameGameWindowAsync(process, "Unora");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"UnableToPatchClient: {ex.Message}");
+                Debug.WriteLine($"Failed to launch game: {ex.Message}");
+                MessageBox.Show($"Failed to launch the game: {ex.Message}", "Launch Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
 
-        private (IPAddress, int) GetServerConnection()
-        {
-            if (UseLocalhost)
-                return (ResolveHostname("127.0.0.1"), 4200);
+        private static (string host, int port) GetLobbyEndpoint(bool useLocalhost) => useLocalhost
+            ? ("127.0.0.1",              4200)
+            : ("chaotic-minds.dynu.net", 6900);
 
-            return (ResolveHostname("chaotic-minds.dynu.net"), 6900);
+
+        private static bool VerifyChaosClientPresent(string installRoot)
+        {
+            var exePath = Path.Combine(installRoot,
+                CONSTANTS.CHAOS_CLIENT_FOLDER_NAME, CONSTANTS.CHAOS_CLIENT_EXECUTABLE);
+
+            if (File.Exists(exePath))
+                return true;
+
+            MessageBox.Show(
+                "Chaos Client not found in the install folder. Please wait for updates to complete and try again.",
+                "Chaos Client Missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
 
-        private static IPAddress ResolveHostname(string hostname)
-        {
-            // Lookup the server hostname (via DNS)
-            var hostEntry = Dns.GetHostEntry(hostname);
-
-            // Find the IPv4 addresses
-            var ipAddresses =
-                from ip in hostEntry.AddressList
-                where ip.AddressFamily == AddressFamily.InterNetwork
-                select ip;
-
-            return ipAddresses.FirstOrDefault();
-        }
-
-        private void PatchClient(SuspendedProcess process, IPAddress serverIPAddress, int serverPort, bool autologin)
-        {
-            using var stream = new ProcessMemoryStream(process.ProcessId);
-            using var patcher = new RuntimePatcher(ClientVersion.Version741, stream, true);
-
-            patcher.ApplyServerHostnamePatch(serverIPAddress);
-            patcher.ApplyServerPortPatch(serverPort);
-
-            if (SkipIntro || autologin)
-                patcher.ApplySkipIntroVideoPatch();
-
-            patcher.ApplyMultipleInstancesPatch();
-            patcher.ApplyFixDarknessPatch();
-        }
-
-        private void InjectDll(IntPtr accessHandle)
-        {
-            const string DLL_NAME = "dawnd.dll";
-            var nameLength = DLL_NAME.Length + 1;
-
-            // Allocate memory and write the DLL name to target process
-            var allocate = NativeMethods.VirtualAllocEx(
-                accessHandle, IntPtr.Zero, (IntPtr)nameLength, 0x1000, 0x40);
-
-            NativeMethods.WriteProcessMemory(
-                accessHandle, allocate, DLL_NAME, (UIntPtr)nameLength, out _);
-
-            var injectionPtr = NativeMethods.GetProcAddress(
-                NativeMethods.GetModuleHandle("kernel32.dll"), "LoadLibraryA");
-
-            if (injectionPtr == UIntPtr.Zero)
-            {
-                MessageBox.Show(this, "Injection pointer was null.", "Injection Error");
-                return;
-            }
-
-            var thread = NativeMethods.CreateRemoteThread(
-                accessHandle, IntPtr.Zero, IntPtr.Zero, injectionPtr, allocate, 0, out _);
-
-            if (thread == IntPtr.Zero)
-            {
-                MessageBox.Show(this, "Remote injection thread was null. Try again...", "Injection Error");
-                return;
-            }
-
-            var result = NativeMethods.WaitForSingleObject(thread, 10 * 1000);
-
-            if (result != WaitEventResult.Signaled)
-            {
-                MessageBox.Show(this, "Injection thread timed out, or signaled incorrectly. Try again...",
-                    "Injection Error");
-                if (thread != IntPtr.Zero)
-                    NativeMethods.CloseHandle(thread);
-                return;
-            }
-
-            NativeMethods.VirtualFreeEx(accessHandle, allocate, (UIntPtr)0, 0x8000);
-            if (thread != IntPtr.Zero)
-                NativeMethods.CloseHandle(thread);
-        }
 
         private async Task RenameGameWindowAsync(Process process, string newTitle)
         {
@@ -1010,22 +928,6 @@ namespace UnoraLaunchpad
                 await Task.Delay(100);
             }
         }
-
-        private void SetWindowTitle()
-        {
-            var selectedGame = _launcherSettings?.SelectedGame?.Trim() ?? "Unora";
-            var title = selectedGame switch
-            {
-                "Legends" => "Legends: Age of Chaos",
-                "Unora" => "Unora: Elemental Harmony",
-                _ => $"Unora Launcher"
-            };
-
-            Title = title; // OS-level window title
-            WindowTitleLabel.Content = title; // Custom title bar label
-        }
-
-
 
         #endregion
 
@@ -1141,60 +1043,26 @@ namespace UnoraLaunchpad
         {
             try
             {
-                var (ipAddress, serverPort) = GetServerConnection();
-                // Ensure _launcherSettings is used, ApplySettings() at start of LaunchSaveBtn_Click should handle this.
-                var selectedGame = _launcherSettings.SelectedGame ?? "Unora";
-                var (gameFolder, gameExe) = GetGameLaunchInfo(selectedGame);
-                var exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, gameFolder, gameExe);
+                var (lobbyHost, lobbyPort) = GetLobbyEndpoint(UseLocalhost);
+                var installRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, CONSTANTS.UNORA_FOLDER_NAME);
 
-                var gameProcessId = 0;
-                using (var suspendedProcess = SuspendedProcess.Start(exePath))
-                {
-                    gameProcessId = suspendedProcess.ProcessId; // Capture PID
-                    PatchClient(suspendedProcess, ipAddress, serverPort, true);
-
-                    // Use 'this.UseDawndWindower' which is synced by ApplySettings()
-                    if (UseDawndWindower)
-                    {
-                        var processHandleForInjection =
-                            NativeMethods.OpenProcess(ProcessAccessFlags.FullAccess, true, gameProcessId);
-                        if (processHandleForInjection != IntPtr.Zero)
-                        {
-                            InjectDll(processHandleForInjection);
-                            NativeMethods.CloseHandle(processHandleForInjection);
-                        }
-                    }
-                } // suspendedProcess is disposed and resumed here
-
-                if (gameProcessId == 0)
-                {
-                    MessageBox.Show("Failed to get game process ID during launch.", "Launch Error", MessageBoxButton.OK,
-                        MessageBoxImage.Error);
+                if (UseChaosClient && !VerifyChaosClientPresent(installRoot))
                     return;
-                }
 
-                Process gameProcess = null;
-                try
-                {
-                    gameProcess = Process.GetProcessById(gameProcessId);
-                }
-                catch (ArgumentException) // Catches if process isn't running
-                {
-                    MessageBox.Show(
-                        "Game process is not running after launch attempt. It might have crashed or failed to start.",
-                        "Launch Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+                var context = new LaunchContext(
+                    installRoot:       installRoot,
+                    lobbyHost:         lobbyHost,
+                    lobbyPort:         lobbyPort,
+                    skipIntro:         true, // auto-login always wants intro skipped for stable timing
+                    useDawndWindower:  UseDawndWindower);
 
-                if (gameProcess == null || gameProcess.HasExited)
-                {
-                    MessageBox.Show("Failed to start or patch the game process, or it exited prematurely.",
-                        "Launch Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
+                IGameLauncher launcher = UseChaosClient
+                    ? (IGameLauncher)new ChaosClientLauncher()
+                    : new LegacyDarkAgesLauncher();
+                var gameProcess = await launcher.LaunchAsync(context);
 
                 // This method already waits for MainWindowHandle to be available
-                await RenameGameWindowAsync(gameProcess, selectedGame);
+                await RenameGameWindowAsync(gameProcess, "Unora");
 
                 if (gameProcess.MainWindowHandle == IntPtr.Zero)
                 {
@@ -1397,7 +1265,6 @@ namespace UnoraLaunchpad
             try
             {
                 ApplySettings();
-                SetWindowTitle();
                 await LoadAndBindGameUpdates();
                 await CheckForFileUpdates();
                 await CheckAndUpdateLauncherAsync();
@@ -1415,22 +1282,10 @@ namespace UnoraLaunchpad
         }
 
 
-        private GameApiRoutes GetCurrentApiRoutes()
-        {
-            // Use your actual API base URL; this will pick the right one for Debug/Release from CONSTANTS
-            var baseUrl = CONSTANTS.BASE_API_URL.TrimEnd('/');
-            var selectedGame = string.IsNullOrWhiteSpace(_launcherSettings?.SelectedGame)
-                ? CONSTANTS.UNORA_FOLDER_NAME // Default to "Unora" if not set
-                : _launcherSettings.SelectedGame;
-
-            return new GameApiRoutes(baseUrl, selectedGame);
-        }
-
         
         public async Task LoadAndBindGameUpdates()
         {
-            var apiRoutes = GetCurrentApiRoutes();
-            var gameUpdates = await UnoraClient.GetGameUpdatesAsync(apiRoutes.GameUpdates);
+            var gameUpdates = await UnoraClient.GetGameUpdatesAsync(UnoraApiRoutes.GameUpdates);
             GameUpdatesControl.DataContext = new { GameUpdates = gameUpdates };
         }
 
