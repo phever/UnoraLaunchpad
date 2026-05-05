@@ -2,8 +2,8 @@
 
 # Configuration
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BINARY_PATH="$PROJECT_DIR/UnoraLaunchpad/bin/Debug/net8.0/linux-x64/UnoraLaunchpad"
-REQUIRED_DOTNET_MAJOR=8
+BINARY_PATH="$PROJECT_DIR/UnoraLaunchpad/bin/Debug/net10.0/linux-x64/UnoraLaunchpad"
+REQUIRED_DOTNET_MAJOR=10
 
 echo "=== Unora Linux Launcher Bootstrapper ==="
 
