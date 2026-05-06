@@ -18,6 +18,10 @@
     <Compile Remove="Launcher/SuspendedProcess.cs" />
     <Compile Remove="Launcher/Win32*.cs" />
     <Compile Remove="Launcher/ProcessMemoryStream.cs" />
+    <Compile Remove="Launcher/LegacyDarkAgesLauncher.cs" />
+    <Compile Remove="Launcher/ChaosClientLauncher.cs" />
+    <Compile Remove="Launcher/IGameLauncher.cs" />
+    <Compile Remove="Launcher/LaunchContext.cs" />
     <Compile Remove="ComboParser.cs" />
     <Compile Remove="RelayCommand.cs" />
     <Compile Remove="ScreenshotInfo.cs" />
@@ -27,19 +31,22 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Polly" Version="8.3.1" />
+    <PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' != 'linux-x64' And '$(OS)' == 'Windows_NT'">
     <PackageReference Include="Costura.Fody" Version="5.7.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="InputSimulator" Version="1.0.4" />
+    <PackageReference Include="InputSimulatorStandard" Version="1.0.0" />
     <PackageReference Include="Ivytalk.Flurl.Http.Net40" Version="3.2.5" />
     <PackageReference Include="MaterialDesignThemes" Version="4.9.0" />
-    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="8.4.0" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Polly" Version="8.3.1" />
-    <PackageReference Include="Polly.Extensions.Http" Version="3.0.0" />
-    <PackageReference Include="InputSimulatorStandard" Version="1.0.0" Condition="'$(Linux)' != 'true'" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" Condition="'$(Linux)' != 'true'" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>

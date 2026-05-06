@@ -9,6 +9,7 @@ public sealed class Settings
     public bool UseLocalhost { get; set; }
     public bool UseChaosClient { get; set; }
     public string SelectedTheme { get; set; }
+    public string SelectedGame { get; set; }
     public double WindowHeight { get; set; }
     public double WindowWidth { get; set; }
     public double WindowTop { get; set; }
