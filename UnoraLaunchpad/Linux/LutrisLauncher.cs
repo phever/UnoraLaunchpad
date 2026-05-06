@@ -14,10 +14,21 @@ public static class LutrisLauncher
     public static Process LaunchGame(string lutrisId)
     {
         Console.WriteLine($"[Lutris] Launching game via Lutris ID: {lutrisId}...");
+        
+        string fileName = "lutris";
+        string arguments = $"lutris:rungame/{lutrisId}";
+
+        // Check if 'lutris' command exists, if not try flatpak
+        if (!CommandExists("lutris") && CommandExists("flatpak"))
+        {
+            fileName = "flatpak";
+            arguments = $"run net.lutris.Lutris lutris:rungame/{lutrisId}";
+        }
+
         var psi = new ProcessStartInfo
         {
-            FileName = "lutris",
-            Arguments = $"lutris:rungame/{lutrisId}",
+            FileName = fileName,
+            Arguments = arguments,
             UseShellExecute = false,
             CreateNoWindow = true,
             RedirectStandardOutput = true,
@@ -30,23 +41,58 @@ public static class LutrisLauncher
         return process;
     }
 
+    private static bool CommandExists(string command)
+    {
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = "which",
+                Arguments = command,
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+            process?.WaitForExit();
+            return process?.ExitCode == 0;
+        }
+        catch { return false; }
+    }
+
     public static Dictionary<string, string> GetLutrisWineEnv(string gameSlug)
     {
         var env = new Dictionary<string, string>();
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        string gamesDir = Path.Combine(home, ".local/share/lutris/games");
-        string runnersDir = Path.Combine(home, ".local/share/lutris/runners/wine");
+        
+        var baseDirs = new[]
+        {
+            Path.Combine(home, ".local/share/lutris"),
+            Path.Combine(home, ".var/app/net.lutris.Lutris/data/lutris")
+        };
 
-        if (!Directory.Exists(gamesDir)) return env;
+        string configPath = null;
+        string runnersDir = null;
 
-        // More flexible search: look for files containing the slug or exactly matching it
-        var files = Directory.GetFiles(gamesDir, "*.yml")
-            .Where(f => Path.GetFileName(f).Contains(gameSlug) || File.ReadAllText(f).Contains($"game_slug: {gameSlug}"))
-            .ToArray();
+        foreach (var baseDir in baseDirs)
+        {
+            string gamesDir = Path.Combine(baseDir, "games");
+            if (!Directory.Exists(gamesDir)) continue;
 
-        if (files.Length == 0) return env;
+            // More flexible search: look for files containing the slug or exactly matching it
+            var files = Directory.GetFiles(gamesDir, "*.yml")
+                .Where(f => Path.GetFileName(f).Contains(gameSlug) || File.ReadAllText(f).Contains($"game_slug: {gameSlug}"))
+                .ToArray();
 
-        string configPath = files[0];
+            if (files.Length > 0)
+            {
+                configPath = files[0];
+                runnersDir = Path.Combine(baseDir, "runners/wine");
+                break;
+            }
+        }
+
+        if (configPath == null || runnersDir == null) return env;
+
         string content = File.ReadAllText(configPath);
 
         // Find wine version

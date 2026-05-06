@@ -21,9 +21,9 @@ echo "[*] Checking dependencies..."
 
 # Check dotnet
 if ! command_exists dotnet; then
-    echo "[!] Error: 'dotnet' is not installed. Please install .NET SDK 8.0."
-    echo "[?] Visit: https://dotnet.microsoft.com/download/dotnet/8.0"
-    echo "[?] Or try installing dotnet-sdk-8.0 via your package manager."
+    echo "[!] Error: 'dotnet' is not installed. Please install .NET SDK 10.0."
+    echo "[?] Visit: https://dotnet.microsoft.com/download/dotnet/10.0"
+    echo "[?] Or try installing dotnet-sdk-10.0 via your package manager."
     exit 1
 fi
 
@@ -32,7 +32,7 @@ DOTNET_VERSION=$(dotnet --version)
 DOTNET_MAJOR=$(echo "$DOTNET_VERSION" | cut -d. -f1)
 if [ "$DOTNET_MAJOR" -lt "$REQUIRED_DOTNET_MAJOR" ]; then
     echo "[!] Error: .NET version $DOTNET_VERSION detected. Version $REQUIRED_DOTNET_MAJOR.x is required."
-    echo "[?] Try installing dotnet-sdk-8.0 via your package manager."
+    echo "[?] Try installing dotnet-sdk-10.0 via your package manager."
     exit 1
 else
     echo "[+] .NET SDK $DOTNET_VERSION detected."
@@ -40,7 +40,11 @@ fi
 
 # Check Lutris (Optional but recommended)
 if ! command_exists lutris; then
-    echo "[!] Warning: 'lutris' not found. Lutris-based launching will be unavailable."
+    if command_exists flatpak && flatpak list | grep -q "net.lutris.Lutris"; then
+        echo "[+] Lutris detected via Flatpak."
+    else
+        echo "[!] Warning: 'lutris' not found. Lutris-based launching will be unavailable."
+    fi
 fi
 
 # Check Wine (Optional but recommended)
