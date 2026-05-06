@@ -30,13 +30,16 @@ public static class Program
             _settings.LutrisId = args[0];
         }
 
-        // Auto-discovery if nothing is configured
-        if (string.IsNullOrEmpty(_settings.LutrisId) && string.IsNullOrEmpty(_settings.GamePath))
+        // Auto-discovery if GamePath is missing
+        if (string.IsNullOrEmpty(_settings.GamePath))
         {
-            Console.WriteLine("[Launcher] No configuration found. Attempting auto-discovery...");
-            string targetSlug = "dark-ages--1";
+            Console.WriteLine("[Launcher] Game path not configured. Attempting discovery...");
+            string targetSlug = string.IsNullOrEmpty(_settings.LutrisId) ? "dark-ages--1" : _settings.LutrisId;
 
-            _settings.LutrisId = targetSlug;
+            if (string.IsNullOrEmpty(_settings.LutrisId))
+            {
+                _settings.LutrisId = targetSlug;
+            }
 
             // Try to find the game path for DLL copying and other logic
             var discoveredPath = LutrisLauncher.GetGamePathFromConfig(targetSlug);
@@ -71,6 +74,11 @@ public static class Program
                 // Save settings so it doesn't have to discover every time
                 FileService.SaveSettings(_settings, LauncherSettingsPath);
             }
+        }
+
+        if (!string.IsNullOrEmpty(_settings.GamePath))
+        {
+            await CheckForFileUpdatesAsync();
         }
 
         var (ipAddress, port) = GetServerConnection();
@@ -326,6 +334,117 @@ public static class Program
         {
             baseDir = Path.Combine(_settings.SelectedGame ?? CONSTANTS.UNORA_FOLDER_NAME);
         }
-        return Path.Combine(baseDir, relativePath);
+
+        // Normalize backslashes to forward slashes for Linux path resolution
+        string normalizedPath = relativePath.Replace('\\', Path.DirectorySeparatorChar);
+        return Path.Combine(baseDir, normalizedPath);
+    }
+
+    private static void CleanupMalformedFiles()
+    {
+        if (string.IsNullOrEmpty(_settings.GamePath) || !Directory.Exists(_settings.GamePath)) return;
+
+        try
+        {
+            var malformedFiles = Directory.GetFiles(_settings.GamePath, "*\\*", SearchOption.AllDirectories);
+            if (malformedFiles.Length > 0)
+            {
+                Console.WriteLine($"[Updater] Cleaning up {malformedFiles.Length} malformed files...");
+                foreach (var file in malformedFiles)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                    }
+                    catch { }
+                }
+            }
+        }
+        catch { }
+    }
+
+    private static async Task CheckForFileUpdatesAsync()
+    {
+        CleanupMalformedFiles();
+        Console.WriteLine("[Updater] Checking for game updates...");
+        try
+        {
+            var fileDetails = await _client.GetFileDetailsAsync(UnoraApiRoutes.FileDetails);
+            var filesToUpdate = fileDetails.Where(NeedsUpdate).ToList();
+
+            if (filesToUpdate.Count == 0)
+            {
+                Console.WriteLine("[Updater] Game is up to date.");
+                return;
+            }
+
+            Console.WriteLine($"[Updater] Updating {filesToUpdate.Count} files...");
+            var totalBytesToDownload = filesToUpdate.Sum(f => f.Size);
+            long totalDownloaded = 0;
+
+            foreach (var fileDetail in filesToUpdate)
+            {
+                var filePath = GetFilePath(fileDetail.RelativePath);
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                Console.Write($"[Updater] Downloading {fileDetail.RelativePath} ({FormatBytes(fileDetail.Size)})... ");
+
+                var progress = new Progress<UnoraClient.DownloadProgress>(p =>
+                {
+                    // For CLI we'll just show completion per file to keep it clean, 
+                    // but we could add a progress bar here if needed.
+                });
+
+                await _client.DownloadFileAsync(UnoraApiRoutes.GameFile(fileDetail.RelativePath), filePath, progress);
+                totalDownloaded += fileDetail.Size;
+                Console.WriteLine("Done.");
+            }
+
+            Console.WriteLine($"[Updater] Successfully updated {FormatBytes(totalDownloaded)}.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Updater] Error checking for updates: {ex.Message}");
+        }
+    }
+
+    private static bool NeedsUpdate(FileDetail fileDetail)
+    {
+        var filePath = GetFilePath(fileDetail.RelativePath);
+        if (!File.Exists(filePath)) return true;
+
+        try
+        {
+            string localHash = CalculateHash(filePath);
+            return !localHash.Equals(fileDetail.Hash, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    private static string CalculateHash(string filePath)
+    {
+        using var md5 = MD5.Create();
+        using var stream = File.OpenRead(filePath);
+        return BitConverter.ToString(md5.ComputeHash(stream));
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        string[] Suffix = { "B", "KB", "MB", "GB", "TB" };
+        int i;
+        double dblSByte = bytes;
+        for (i = 0; i < Suffix.Length && bytes >= 1024; i++, bytes /= 1024)
+        {
+            dblSByte = bytes / 1024.0;
+        }
+
+        return $"{dblSByte:0.##} {Suffix[i]}";
     }
 }

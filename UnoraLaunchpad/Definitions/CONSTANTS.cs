@@ -2,7 +2,7 @@ namespace UnoraLaunchpad.Definitions;
 
 public static class CONSTANTS
 {
-#if DEBUG
+#if DEBUG && !Linux
     public const string BASE_API_URL = "http://localhost:5001/api/files/";
 #else
     public const string BASE_API_URL = "http://unora.freeddns.org:5001/api/files/";
