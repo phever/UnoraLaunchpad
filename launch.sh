@@ -19,6 +19,12 @@ echo "[*] $GIT_OUTPUT"
 # 1. Dependency Checks
 echo "[*] Checking dependencies..."
 
+# Check for required DLLs
+if [ ! -f "UnoraLaunchpad/Resources/dawnd.dll" ] || [ ! -f "UnoraLaunchpad/Resources/ddraw.dll" ]; then
+    echo "[!] Error: Required DLLs (dawnd.dll/ddraw.dll) not found in UnoraLaunchpad/Resources/"
+    exit 1
+fi
+
 # Check dotnet
 if ! command_exists dotnet; then
     echo "[!] Error: 'dotnet' is not installed. Please install .NET SDK 10.0."
@@ -74,12 +80,45 @@ fi
 echo "[*] Building project..."
 cd "$PROJECT_DIR" || exit 1
 
-# Ensure LauncherSettings directory exists so it can be copied/referenced
+# Ensure LauncherSettings and Resources directories exist so they can be copied/referenced
 mkdir -p UnoraLaunchpad/LauncherSettings
+mkdir -p "$(dirname "$BINARY_PATH")/Resources"
 
 if ! dotnet build UnoraLaunchpad/UnoraLaunchpad.csproj -r linux-x64 -v quiet; then
     echo "[!] Build failed. Please check the errors above."
     exit 1
+fi
+
+# Copy Resources to the binary directory
+cp -r UnoraLaunchpad/Resources/* "$(dirname "$BINARY_PATH")/Resources/"
+
+# 3.5 Sync DLLs to game directory
+echo "[*] Syncing resources to game directory..."
+SETTINGS_FILE="UnoraLaunchpad/LauncherSettings/settings.json"
+GAME_PATH=""
+
+if [ -f "$SETTINGS_FILE" ]; then
+    # Simple extraction of GamePath from settings.json
+    GAME_PATH=$(sed -n 's/.*"GamePath": "\(.*\)".*/\1/p' "$SETTINGS_FILE")
+fi
+
+# Fallback auto-discovery for common Linux paths if settings is empty or invalid
+if [ -z "$GAME_PATH" ] || [ ! -d "$GAME_PATH" ]; then
+    for DP in "$HOME/Games/dark-ages--1/drive_c/Program Files/Dark Ages" "$HOME/Games/dark-ages/drive_c/Program Files/Dark Ages"; do
+        if [ -d "$DP" ]; then
+            GAME_PATH="$DP"
+            break
+        fi
+    done
+fi
+
+if [ -d "$GAME_PATH" ]; then
+    echo "[+] Found game directory: $GAME_PATH"
+    cp "UnoraLaunchpad/Resources/dawnd.dll" "$GAME_PATH/"
+    cp "UnoraLaunchpad/Resources/ddraw.dll" "$GAME_PATH/"
+    echo "[+] DLLs copied to game folder."
+else
+    echo "[!] Warning: Could not find game directory to sync DLLs. Launcher will attempt discovery at runtime."
 fi
 
 # 4. Run the binary

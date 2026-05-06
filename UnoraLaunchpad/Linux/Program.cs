@@ -81,7 +81,7 @@ public static class Program
             winePrefix = _settings.GamePath.Substring(0, _settings.GamePath.IndexOf("drive_c"));
         }
 
-        if (_settings.UseDawndWindower && !string.IsNullOrEmpty(_settings.GamePath))
+        if (!string.IsNullOrEmpty(_settings.GamePath))
         {
             try
             {
