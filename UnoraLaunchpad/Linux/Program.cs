@@ -30,6 +30,49 @@ public static class Program
             _settings.LutrisId = args[0];
         }
 
+        // Auto-discovery if nothing is configured
+        if (string.IsNullOrEmpty(_settings.LutrisId) && string.IsNullOrEmpty(_settings.GamePath))
+        {
+            Console.WriteLine("[Launcher] No configuration found. Attempting auto-discovery...");
+            string targetSlug = "dark-ages--1";
+
+            _settings.LutrisId = targetSlug;
+
+            // Try to find the game path for DLL copying and other logic
+            var discoveredPath = LutrisLauncher.GetGamePathFromConfig(targetSlug);
+            if (!string.IsNullOrEmpty(discoveredPath))
+            {
+                _settings.GamePath = discoveredPath;
+                Console.WriteLine($"[Launcher] Discovered game path: {_settings.GamePath}");
+            }
+            else
+            {
+                // Fallback to common default
+                string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                var defaultPaths = new[]
+                {
+                    Path.Combine(home, "Games", "dark-ages--1", "drive_c", "Program Files", "Dark Ages"),
+                    Path.Combine(home, "Games", "dark-ages", "drive_c", "Program Files", "Dark Ages")
+                };
+
+                foreach (var path in defaultPaths)
+                {
+                    if (Directory.Exists(path))
+                    {
+                        _settings.GamePath = path;
+                        Console.WriteLine($"[Launcher] Found game at default path: {_settings.GamePath}");
+                        break;
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(_settings.GamePath))
+            {
+                // Save settings so it doesn't have to discover every time
+                FileService.SaveSettings(_settings, LauncherSettingsPath);
+            }
+        }
+
         var (ipAddress, port) = GetServerConnection();
 
         string winePrefix = null;

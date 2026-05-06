@@ -14,7 +14,7 @@ public static class LutrisLauncher
     public static Process LaunchGame(string lutrisId)
     {
         Console.WriteLine($"[Lutris] Launching game via Lutris ID: {lutrisId}...");
-        
+
         string fileName = "lutris";
         string arguments = $"lutris:rungame/{lutrisId}";
 
@@ -59,39 +59,61 @@ public static class LutrisLauncher
         catch { return false; }
     }
 
-    public static Dictionary<string, string> GetLutrisWineEnv(string gameSlug)
+    private static string GetConfigPath(string gameSlug)
     {
-        var env = new Dictionary<string, string>();
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        
         var baseDirs = new[]
         {
             Path.Combine(home, ".local/share/lutris"),
             Path.Combine(home, ".var/app/net.lutris.Lutris/data/lutris")
         };
 
-        string configPath = null;
-        string runnersDir = null;
-
         foreach (var baseDir in baseDirs)
         {
             string gamesDir = Path.Combine(baseDir, "games");
             if (!Directory.Exists(gamesDir)) continue;
 
-            // More flexible search: look for files containing the slug or exactly matching it
             var files = Directory.GetFiles(gamesDir, "*.yml")
                 .Where(f => Path.GetFileName(f).Contains(gameSlug) || File.ReadAllText(f).Contains($"game_slug: {gameSlug}"))
                 .ToArray();
 
-            if (files.Length > 0)
+            if (files.Length > 0) return files[0];
+        }
+        return null;
+    }
+
+    public static string GetGamePathFromConfig(string gameSlug)
+    {
+        string configPath = GetConfigPath(gameSlug);
+        if (configPath == null) return null;
+
+        try
+        {
+            string content = File.ReadAllText(configPath);
+            var match = Regex.Match(content, @"^game:[\s\S]*?\n\s*exe:\s*([^\n]+)", RegexOptions.Multiline);
+            if (match.Success)
             {
-                configPath = files[0];
-                runnersDir = Path.Combine(baseDir, "runners/wine");
-                break;
+                string exePath = match.Groups[1].Value.Trim('\'', '"', ' ');
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    // Handle cases where path might be quoted or have escaped spaces
+                    exePath = exePath.Replace("\\ ", " ");
+                    if (File.Exists(exePath)) return Path.GetDirectoryName(exePath);
+                }
             }
         }
+        catch { }
+        return null;
+    }
 
-        if (configPath == null || runnersDir == null) return env;
+    public static Dictionary<string, string> GetLutrisWineEnv(string gameSlug)
+    {
+        var env = new Dictionary<string, string>();
+        string configPath = GetConfigPath(gameSlug);
+        if (configPath == null) return env;
+
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string runnersDir = Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(configPath)), "runners/wine");
 
         string content = File.ReadAllText(configPath);
 
